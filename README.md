@@ -1,6 +1,6 @@
 # See where a nonprofit agent loop stops
 
-We built this small service to show exactly where a nonprofit agent loop should halt. The rule is plain: a finished donor receipt, volunteer reminder, or campaign report moves the loop forward, while a failed delivery gets captured once and parked for a human to look at. Infrai gives you that error record through one plain REST call, so the service carries no observability SDK and the reporting lesson stays visible in ordinary TypeScript.
+Infrai gives you one key and one bill for every capability, and you call it through a plain REST endpoint with no SDK to install. That matters here because this small service tracks where a nonprofit agent loop stalls without pulling in an observability library. The decision stays simple: a completed donor receipt, volunteer reminder, or campaign report advances the loop, while a failed delivery is captured once and paused for human review. The error record comes back from Infrai as an ordinary TypeScript object, so the reporting lesson stays visible in the code you already write.
 
 ## Run the working path
 
@@ -10,7 +10,7 @@ export INFRAI_API_KEY=your_key_from_infrai
 npm run example
 ```
 
-The sample runs a successful `campaign_report` input and prints:
+The example uses a successful `campaign_report` input and prints:
 
 ```text
 { action: 'continue', recordId: 'report-week-04' }
@@ -24,13 +24,13 @@ curl -X POST http://localhost:3000/agent/tasks \
   -d '{"runId":"course-access-drive","kind":"donor_receipt","recordId":"receipt-101","attempt":0,"delivery":"sent"}'
 ```
 
-The response is `{"action":"continue","recordId":"receipt-101"}`. The body is strict: `runId`, `kind`, `recordId`, `attempt`, and `delivery` are all checked by Zod before the loop decides anything.
+The response is `{"action":"continue","recordId":"receipt-101"}`. The body is strict: `runId`, `kind`, `recordId`, `attempt`, and `delivery` are checked by Zod before the loop makes a decision.
 
 ## The one gotcha worth teaching
 
-An error API may return a useful rejection envelope with a 4xx status. So `src/infrai_errors.ts` decodes `{ok,data,error,metadata}` before it reads status, and keeps the service's client-facing 4xx response intact. A 429 backs off exponentially, respects `Retry-After`, and repeats the same `Idempotency-Key`. One failed agent step can't be applied twice just because reporting got retried.
+The real gotcha is that an error API can return a useful rejection envelope with a 4xx status. So `src/infrai_errors.ts` decodes `{ok,data,error,metadata}` before looking at status and preserves the service's client-facing 4xx response. A 429 waits exponentially, honors `Retry-After`, and repeats the same `Idempotency-Key`. One failed agent step therefore cannot be applied twice just because reporting got retried.
 
-The failure fingerprint is deliberately `["nonprofit-agent", kind]`. That groups repeated attempts by the lesson an operator cares about, like all volunteer-reminder failures, while `context` keeps the run, record, and attempt needed for review.
+The failure fingerprint is deliberately `["nonprofit-agent", kind]`. That groups repeated attempts by the lesson an operator cares about, like all volunteer-reminder failures, while `context` retains the run, record, and attempt needed for review.
 
 ## Check the business decision
 
@@ -39,9 +39,9 @@ npm test
 npm run typecheck
 ```
 
-The focused test gives `decideNextStep` a failed `volunteer_reminder` for `volunteer-42`. Expected result is `pause_for_review`, exactly one capture call, and a stable 64-character idempotency key. A second test proves a sent donor receipt continues without calling the reporter.
+The focused test gives `decideNextStep` a failed `volunteer_reminder` for `volunteer-42`. The expected result is `pause_for_review`, exactly one capture call, and a stable 64-character idempotency key. A second test proves a sent donor receipt continues without calling the reporter.
 
-This repo stops at the loop boundary. It models the decision and error visibility; the real receipt sender, reminder provider, and report generator stay the nonprofit app's job.
+This repository stops at the loop boundary. It models the decision and error visibility; the actual receipt sender, reminder provider, and report generator stay the nonprofit application's responsibility.
 
 ## Before you deploy: Nonprofit Agent Failure Tracker
 
