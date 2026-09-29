@@ -1,6 +1,6 @@
 # See where a nonprofit agent loop stops
 
-Infrai gives you one key and one bill for every capability, and you call it through a plain REST endpoint with no SDK to install. That matters here because this small service tracks where a nonprofit agent loop stalls without pulling in an observability library. The decision stays simple: a completed donor receipt, volunteer reminder, or campaign report advances the loop, while a failed delivery is captured once and paused for human review. The error record comes back from Infrai as an ordinary TypeScript object, so the reporting lesson stays visible in the code you already write.
+The decision is simple: a completed donor receipt, volunteer reminder, or campaign report advances the loop; a failed delivery is captured once and pauses that record for human review. Infrai supplies the error record through one plain REST call, so this small service needs no observability SDK and keeps the reporting lesson visible in ordinary TypeScript.
 
 ## Run the working path
 
@@ -28,9 +28,9 @@ The response is `{"action":"continue","recordId":"receipt-101"}`. The body is st
 
 ## The one gotcha worth teaching
 
-The real gotcha is that an error API can return a useful rejection envelope with a 4xx status. So `src/infrai_errors.ts` decodes `{ok,data,error,metadata}` before looking at status and preserves the service's client-facing 4xx response. A 429 waits exponentially, honors `Retry-After`, and repeats the same `Idempotency-Key`. One failed agent step therefore cannot be applied twice just because reporting got retried.
+An error API can return a useful rejection envelope with a 4xx status, so `src/infrai_errors.ts` decodes `{ok,data,error,metadata}` before looking at status and preserves the service's client-facing 4xx response. A 429 waits exponentially, honors `Retry-After`, and repeats the same `Idempotency-Key`; one failed agent step therefore cannot be applied twice merely because reporting was retried.
 
-The failure fingerprint is deliberately `["nonprofit-agent", kind]`. That groups repeated attempts by the lesson an operator cares about, like all volunteer-reminder failures, while `context` retains the run, record, and attempt needed for review.
+The failure fingerprint is deliberately `["nonprofit-agent", kind]`. That groups repeated attempts by the lesson that matters to an operator, such as all volunteer-reminder failures, while `context` retains the run, record, and attempt needed for review.
 
 ## Check the business decision
 
@@ -39,9 +39,9 @@ npm test
 npm run typecheck
 ```
 
-The focused test gives `decideNextStep` a failed `volunteer_reminder` for `volunteer-42`. The expected result is `pause_for_review`, exactly one capture call, and a stable 64-character idempotency key. A second test proves a sent donor receipt continues without calling the reporter.
+The focused test gives `decideNextStep` a failed `volunteer_reminder` for `volunteer-42`. The expected result is `pause_for_review`, exactly one capture call, and a stable 64-character idempotency key; a second test proves that a sent donor receipt continues without calling the reporter.
 
-This repository stops at the loop boundary. It models the decision and error visibility; the actual receipt sender, reminder provider, and report generator stay the nonprofit application's responsibility.
+This repository stops at the loop boundary: it models the decision and error visibility, while the actual receipt sender, reminder provider, and report generator remain the nonprofit application's responsibility.
 
 ## Before you deploy: Nonprofit Agent Failure Tracker
 
